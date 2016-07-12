@@ -1,0 +1,190 @@
+================================================================================
+# #Step-1a: Install custom resource
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cp  nova_admission_control.py to /usr/lib/python2.7/dist-packages/heat/engine/resources/openstack/nova/
+service heat-engine restart
+
+
+# #Step-1b: verify resource correctly loaded in heat
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+root@ckravi-build:~/super_heat# heat resource-type-list | grep Admission
+| OS::Nova::AdmissionControl                 |
+root@ckravi-build:~/super_heat# heat resource-type-show OS::Nova::AdmissionControl
+{
+  "attributes": {
+    "load": {
+      "description": "The load."
+    },
+    "state": {
+      "description": "Admission control result: GRANTED/DENIED."
+    }
+  },
+  "properties": {
+    "name": {
+      "description": "The name of the resource on which we do admission control: eg VMs/VNF_license/ .",
+      "required": true,
+      "update_allowed": false,
+      "type": "string",
+      "immutable": false,
+      "constraints": [
+        {
+          "length": {
+            "max": 255,
+            "min": 1
+          }
+        }
+      ]
+    },
+    "res_class": {
+      "description": "The class of the admission control credit. Gold/Silver/Bronze",
+      "required": true,
+      "update_allowed": false,
+      "type": "string",
+      "immutable": false,
+      "constraints": [
+        {
+          "length": {
+            "max": 255,
+            "min": 1
+          }
+        }
+      ]
+    }
+  },
+  "resource_type": "OS::Nova::AdmissionControl"
+}
+================================================================================
+# #Step 2: Observe the resource usage per class
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+root@ckravi-build:~/super_heat# python resource_status.py
+Nova_VNF_Gold=5
+Nova_VNF_Bronze=0
+Nova_VNF_Silver=1
+================================================================================
+# #Step 3: Verify bronze services are denied when utilization is more than 20%
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+root@ckravi-build:~/super_heat# heat stack-create -f cac_bronze.yaml bronze
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+| id                                   | stack_name                               | stack_status       | creation_time        |
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+| 2ee41cb0-cfa2-406a-8a71-863609cc88f7 | gold_1                                   | CREATE_COMPLETE    | 2016-07-12T13:58:48Z |
+| 740fbfb9-6382-4754-b2d3-25a0f0c84083 | gold_2                                   | CREATE_COMPLETE    | 2016-07-12T13:58:49Z |
+| bc41d56a-7824-412e-b63d-4c49c667ee22 | gold_3                                   | CREATE_COMPLETE    | 2016-07-12T13:58:50Z |
+| 45ae3000-7b07-4e38-b7dd-7805b776c66f | gold_4                                   | CREATE_COMPLETE    | 2016-07-12T13:58:52Z |
+| 564ec614-c4ba-4ebd-92db-357d93d2ef3a | gold_5                                   | CREATE_COMPLETE    | 2016-07-12T13:58:53Z |
+| 543584bd-ac9b-4835-86b4-032f50b3842b | silver_1                                 | CREATE_COMPLETE    | 2016-07-12T15:10:13Z |
+| 813563c2-c8f9-4214-9e8c-ee92e5c47dea | bronze                                   | CREATE_IN_PROGRESS | 2016-07-12T17:01:32Z |
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+root@ckravi-build:~/super_heat# heat stack-show bronze
++-----------------------+------------------------------------------------------------------------------------------------------------------------+
+| Property              | Value                                                                                                                  |
++-----------------------+------------------------------------------------------------------------------------------------------------------------+
+| capabilities          | []                                                                                                                     |
+| creation_time         | 2016-07-12T17:01:32Z                                                                                                   |
+| description           | HOT template to create  network service                                                                                |
+| disable_rollback      | True                                                                                                                   |
+| id                    | 813563c2-c8f9-4214-9e8c-ee92e5c47dea                                                                                   |
+| links                 | http://10.213.4.249:8004/v1/235ac294b7af45cab217b4f16b374613/stacks/bronze/813563c2-c8f9-4214-9e8c-ee92e5c47dea (self) |
+| notification_topics   | []                                                                                                                     |
+| outputs               | []                                                                                                                     |
+| parameters            | {                                                                                                                      |
+|                       |   "OS::project_id": "235ac294b7af45cab217b4f16b374613",                                                                |
+|                       |   "OS::stack_id": "813563c2-c8f9-4214-9e8c-ee92e5c47dea",                                                              |
+|                       |   "OS::stack_name": "bronze"                                                                                           |
+|                       | }                                                                                                                      |
+| parent                | None                                                                                                                   |
+| stack_name            | bronze                                                                                                                 |
+| stack_owner           | admin                                                                                                                  |
+| stack_status          | CREATE_FAILED                                                                                                          |
+| stack_status_reason   | Resource CREATE failed: RequestLimitExceeded:                                                                          |
+|                       | resources.vSRX_credit: Request limit exceeded: Resource                                                                |
+|                       | vSRX_credit  utilization 60% violates class Bronze                                                                     |
+|                       | threshold 25%.                                                                                                         |
+| stack_user_project_id | 235ac294b7af45cab217b4f16b374613                                                                                       |
+| template_description  | HOT template to create  network service                                                                                |
+| timeout_mins          | None                                                                                                                   |
+| updated_time          | None                                                                                                                   |
++-----------------------+------------------------------------------------------------------------------------------------------------------------+
+root@ckravi-build:~/super_heat#
+root@ckravi-build:~/super_heat#
+root@ckravi-build:~/super_heat# python resource_status.py
+Nova_VNF_Gold=5
+Nova_VNF_Bronze=0
+Nova_VNF_Silver=1
+================================================================================
+# #Step 4: Verify Gold services are still allowed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+root@ckravi-build:~/super_heat# heat stack-create -f cac_gold.yaml gold
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+| id                                   | stack_name                               | stack_status       | creation_time        |
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+| 2ee41cb0-cfa2-406a-8a71-863609cc88f7 | gold_1                                   | CREATE_COMPLETE    | 2016-07-12T13:58:48Z |
+| 740fbfb9-6382-4754-b2d3-25a0f0c84083 | gold_2                                   | CREATE_COMPLETE    | 2016-07-12T13:58:49Z |
+| bc41d56a-7824-412e-b63d-4c49c667ee22 | gold_3                                   | CREATE_COMPLETE    | 2016-07-12T13:58:50Z |
+| 45ae3000-7b07-4e38-b7dd-7805b776c66f | gold_4                                   | CREATE_COMPLETE    | 2016-07-12T13:58:52Z |
+| 564ec614-c4ba-4ebd-92db-357d93d2ef3a | gold_5                                   | CREATE_COMPLETE    | 2016-07-12T13:58:53Z |
+| a1f67160-ad7b-4a1b-90e7-a52bf5870bb5 | b1                                       | CREATE_FAILED      | 2016-07-12T15:08:41Z |
+| 543584bd-ac9b-4835-86b4-032f50b3842b | silver1                                  | CREATE_COMPLETE    | 2016-07-12T15:10:13Z |
+| 6b5f4f86-a0f4-49d2-86c3-5ea2fe7968f3 | b2                                       | CREATE_FAILED      | 2016-07-12T16:56:15Z |
+| 813563c2-c8f9-4214-9e8c-ee92e5c47dea | bronze                                   | CREATE_FAILED      | 2016-07-12T17:01:32Z |
+| e3525b93-b95c-4d87-86ea-a6c7dc1d6bc9 | gold                                     | CREATE_IN_PROGRESS | 2016-07-12T17:03:07Z |
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+root@ckravi-build:~/super_heat# heat stack-show gold
++-----------------------+----------------------------------------------------------------------------------------------------------------------+
+| Property              | Value                                                                                                                |
++-----------------------+----------------------------------------------------------------------------------------------------------------------+
+| capabilities          | []                                                                                                                   |
+| creation_time         | 2016-07-12T17:03:07Z                                                                                                 |
+| description           | HOT template to create  network service                                                                              |
+| disable_rollback      | True                                                                                                                 |
+| id                    | e3525b93-b95c-4d87-86ea-a6c7dc1d6bc9                                                                                 |
+| links                 | http://10.213.4.249:8004/v1/235ac294b7af45cab217b4f16b374613/stacks/gold/e3525b93-b95c-4d87-86ea-a6c7dc1d6bc9 (self) |
+| notification_topics   | []                                                                                                                   |
+| outputs               | []                                                                                                                   |
+| parameters            | {                                                                                                                    |
+|                       |   "OS::project_id": "235ac294b7af45cab217b4f16b374613",                                                              |
+|                       |   "OS::stack_id": "e3525b93-b95c-4d87-86ea-a6c7dc1d6bc9",                                                            |
+|                       |   "OS::stack_name": "gold"                                                                                           |
+|                       | }                                                                                                                    |
+| parent                | None                                                                                                                 |
+| stack_name            | gold                                                                                                                 |
+| stack_owner           | admin                                                                                                                |
+| stack_status          | CREATE_COMPLETE                                                                                                      |
+| stack_status_reason   | Stack CREATE completed successfully                                                                                  |
+| stack_user_project_id | 235ac294b7af45cab217b4f16b374613                                                                                     |
+| template_description  | HOT template to create  network service                                                                              |
+| timeout_mins          | None                                                                                                                 |
+| updated_time          | None                                                                                                                 |
++-----------------------+----------------------------------------------------------------------------------------------------------------------+
+root@ckravi-build:~/super_heat# python resource_status.py
+Nova_VNF_Gold=6
+Nova_VNF_Bronze=0
+Nova_VNF_Silver=1
+================================================================================
+# #Step 5: Cleanup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+root@ckravi-build:~/super_heat# heat stack-delete gold_1 gold_2 gold_3 gold_4 gold_5 b1 s1 b2 bronze gold
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+| id                                   | stack_name                               | stack_status       | creation_time        |
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+| 564ec614-c4ba-4ebd-92db-357d93d2ef3a | gold_5                                   | DELETE_IN_PROGRESS | 2016-07-12T13:58:53Z |
+| a1f67160-ad7b-4a1b-90e7-a52bf5870bb5 | b1                                       | DELETE_IN_PROGRESS | 2016-07-12T15:08:41Z |
+| 543584bd-ac9b-4835-86b4-032f50b3842b | s1                                       | DELETE_IN_PROGRESS | 2016-07-12T15:10:13Z |
+| 6b5f4f86-a0f4-49d2-86c3-5ea2fe7968f3 | b2                                       | DELETE_IN_PROGRESS | 2016-07-12T16:56:15Z |
+| 813563c2-c8f9-4214-9e8c-ee92e5c47dea | bronze                                   | DELETE_IN_PROGRESS | 2016-07-12T17:01:32Z |
+| e3525b93-b95c-4d87-86ea-a6c7dc1d6bc9 | gold                                     | DELETE_IN_PROGRESS | 2016-07-12T17:03:07Z |
++--------------------------------------+------------------------------------------+--------------------+----------------------+
+================================================================================
+# #Step 6: Miscellaneous: In case the reference counts get messed up, reset using the below command
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Usage: python resource_status.py cleanup <space separated list of resources that needs to be reset>
+
+root@ckravi-build:~/super_heat# python resource_status.py cleanup Nova_VNF_Gold Nova_VNF_Bronze Nova_VNF_Silver
+Nova_VNF_Gold=0
+Nova_VNF_Bronze=0
+Nova_VNF_Silver=0
+reset Nova_VNF_Gold
+reset Nova_VNF_Bronze
+reset Nova_VNF_Silver
+root@ckravi-build:~/super_heat#

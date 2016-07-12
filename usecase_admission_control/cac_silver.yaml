@@ -1,0 +1,12 @@
+description: 'HOT template to create  network service
+
+  '
+heat_template_version: '2013-05-23'
+outputs:
+parameters:
+resources:
+  vSRX_credit:
+    type: OS::Nova::AdmissionControl
+    properties:
+      name: vSRX_credit_silver	
+      res_class: Silver
