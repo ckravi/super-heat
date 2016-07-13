@@ -1,4 +1,4 @@
-# SUPER-HEAT: Extending heat to do more than just orchestration
+# SuperHEAT: Extending heat to do more than just orchestration
 
 **Example HEAT resources and templates to demonstrate super-heating**
 
@@ -12,14 +12,9 @@ The precursor to this idea is our work with DMTF/CIM based modelling and managin
 
 To demonstrate this power in heat, we create simple custom heat resources that would efficiently do:
 
-* Certain OSS/BSS tasks like granular accounting and metering.
-* Intelligent oversubscription
-* Intelligent service parameter discovery
-
-## Usecase: Per-tenant Per-VNF metering record
-
-Use heat to generate accounting records of usage of every type of VNF on a per-tenant basis.
-This can easily be extended to do OSS/BSS task like billing, licensing etc.
+* Certain OSS/BSS tasks like business based accounting and metering.
+* Intelligent capacity oversubscription
+* Intelligent network service parameter discovery
 
 
 ## Usecase: Priority Aware Network Service Admission Control
@@ -72,15 +67,64 @@ are not met.
 
 ###Example Problem:
 A newly launched network service should be created on the currently least loaded availability zone.
+This can be extended to a range of placement problems to achieve proximity, load-balancing etc.
 
 ###Solution:
 Create a custom resource called  AvailZone.
 It has an attribute called least_loaded_zone.
+           
+            class AvailZoneFinder(resource.Resource):
+
+            """
+            A resource for class aware optimal availability zone selection
+
+            """
+            support_status = support.SupportStatus(version='2014.1')
+
+            PROPERTIES = (
+                NAME, RES_CLASS,
+            ) = (
+                'name', 'res_class',
+            )
+
+            ATTRIBUTES = (
+                LEAST_LOADED_ZONE,
+            ) = (
+                'least_loaded_zone',
+            )
+
+            @property
+            def least_loaded_zone(self):
+                best_z = None
+                for zone in self.avz_list():
+                    if not best_z or best_z.load > zone.load:
+                        best_z = zone
+                return zone
+
+
 This attribute is computed by querying the different zone usage.
 The Nova::Server resource's availability zone parameter is set from the  AvailZone's least_loaded_zone attribute.
+
+
+    AvailZone:
+        type: OS::Nova::AvailZoneFinder
+        properties:
+            name: avail_zone_least
+            res_class: gold
 
     vSRX_Firewall-0-vnf-nova-instance:
         type: OS::Nova::Server
             properties:
                 availability_zone : { get_attr: [ AvailZone, least_loaded_zone ] }
 
+
+## Usecase: VNF License management
+Popular VNFs like vSRX require licenses. So Service Provider needs to do some of the following:
+i) acquire license from the vendor for each instance created in a network service
+ii) control the number of licensed VNFs on a per tenant basis.
+
+
+## Usecase: Per-tenant Per-VNF metering record
+
+Use heat to generate accounting records of usage of every type of VNF on a per-tenant basis.
+This can easily be extended to do OSS/BSS task like billing, licensing etc.
