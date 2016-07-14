@@ -44,7 +44,7 @@ monitor the current available capacity, if available, reserve the resource,
 and then launch the heat-stack. 
 However, these cannot be done atomically through the HEAT API.
 Doing this inside the heat engine avoids this problem.
-
+![slide1](https://cloud.githubusercontent.com/assets/12163840/16837219/a06de226-49df-11e6-8dea-9210ccf55b1d.jpg)
 ###Steps:
 Create a custom resource:  OS::Nova::AdmissionControl
 In every stack template corresponding to the customer's service request,
