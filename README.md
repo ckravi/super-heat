@@ -57,6 +57,8 @@ and threshold.
 Stack creation is permitted only if the resource's class is within its
 threshold.
 
+![slide1](https://cloud.githubusercontent.com/assets/12163840/17172750/5b7946ee-5414-11e6-90f1-e9150aa7b78c.jpg)
+
 This admission control can be extended to do eviction of already created
 lower priority resources, when new requests for higher priority classes 
 are not met.
